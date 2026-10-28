@@ -39,3 +39,29 @@ resultado UI ante un login con token pero sin `user`; no se convirtió el bug
 observado en comportamiento esperado por una prueba. La cobertura, comandos y
 resultados reales están en `docs/TESTING.md`. Casos: `web/src/app/session/session-flow.spec.ts:40,104,124,139,155,171,189,199,216,229,241`;
 etiquetas: `web/src/app/utils/legacy-format.spec.ts:5,9,13`.
+
+## Candidatos de discovery — web
+
+### H-WEB-08 — Error no controlado si la respuesta de login omite `user`
+- Estado: CANDIDATO
+- Evidencia: `web/src/app/login/login.component.ts:47-49` guarda `response.data.user` si existe un token; `web/src/app/session/session.service.ts:8-10` serializa el usuario; `web/src/app/dashboard/dashboard.component.ts:42-43` analiza el valor de sesión antes del bloque `try`.
+- Impacto: si `user` está ausente, su serialización puede almacenarse como el texto `undefined`; el dashboard puede fallar en `JSON.parse` antes de manejar el error, interrumpiendo el flujo posterior al login.
+- Prioridad propuesta: Media (P2), por el impacto funcional condicionado a una respuesta incompleta o sesión alterada.
+- Contrato potencialmente afectado: respuesta de `POST /auth/login` y datos de sesión requeridos por el dashboard; el contrato observado no define si `user` es obligatorio.
+- Cómo validarlo: agregar pruebas con respuesta de login con token y sin `user`, y con valor de usuario inválido almacenado; comprobar que el resultado acordado se maneje sin excepción no controlada.
+
+### H-WEB-09 — Valor `owner` concatenado directamente en la URL de tareas
+- Estado: CANDIDATO
+- Evidencia: `web/src/app/dashboard/dashboard.component.ts:49` concatena `this.user.username` directamente en `?owner=`; `web/src/app/session/session-flow.spec.ts:87` solo caracteriza el nombre simple `student`.
+- Impacto: si se admite un nombre de usuario con caracteres reservados de URL, el filtro puede interpretarse como parámetros distintos y no representar el usuario esperado.
+- Prioridad propuesta: Baja (P3), condicionada a los caracteres permitidos por el contrato de identidad.
+- Contrato potencialmente afectado: parámetro `owner` de `GET /api/tasks`; no está confirmado el conjunto permitido de caracteres.
+- Cómo validarlo: acordar los caracteres válidos para `username` y probar nombres con caracteres reservados; verificar que la solicitud codifique el valor y que el servicio reciba el `owner` esperado.
+
+### H-WEB-10 — Respuesta 401 conserva la sesión y no redirige
+- Estado: CANDIDATO
+- Evidencia: `web/src/app/dashboard/dashboard.component.ts:67-75` muestra el error sin limpiar sesión ni navegar; `web/src/app/session/session-flow.spec.ts:199-213` caracteriza explícitamente que ante 401 se conserva el token y no se redirige.
+- Impacto: una sesión con token rechazado permanece en el almacenamiento y puede provocar solicitudes fallidas repetidas; no se ha confirmado si el servicio usa 401 para indicar sesión inválida o si el comportamiento actual es intencional.
+- Prioridad propuesta: Media (P2), pendiente de confirmar el significado contractual del 401.
+- Contrato potencialmente afectado: manejo de autenticación y errores de `GET /api/tasks`, además del ciclo de vida de sesión en web.
+- Cómo validarlo: confirmar con responsables del servicio el significado de 401 y el resultado esperado para la sesión; ajustar o conservar la prueba existente según la decisión y verificar que el flujo final cumpla el contrato.
