@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 
+EXPECTED_MAX_REQUIREMENT_UPLOAD_BYTES = 10_000_000
+
 
 def token(username: str = "student", role: str = "STUDENT") -> str:
     raw = f"{username}|{role}|{int(time.time()) + 3600}|WORKSHOP_SECRET_2026"
@@ -116,6 +118,45 @@ def test_uploads_requirement(tmp_path: Path) -> None:
         )
     assert response.status_code == 201
     assert (upload_dir / "requirements.txt").exists()
+
+
+def test_uploads_requirement_at_maximum_size(tmp_path: Path) -> None:
+    upload_dir = tmp_path / "uploads"
+    app = create_app(str(tmp_path / "workshop.db"), str(upload_dir))
+    content = b"x" * EXPECTED_MAX_REQUIREMENT_UPLOAD_BYTES
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/requirements",
+            headers=headers(),
+            files={"file": ("requirements.txt", content, "text/plain")},
+        )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "owner": "student",
+        "fileName": "requirements.txt",
+        "storedAt": str(upload_dir / "requirements.txt"),
+        "size": EXPECTED_MAX_REQUIREMENT_UPLOAD_BYTES,
+    }
+    assert (upload_dir / "requirements.txt").stat().st_size == EXPECTED_MAX_REQUIREMENT_UPLOAD_BYTES
+
+
+def test_rejects_requirement_over_maximum_size(tmp_path: Path) -> None:
+    upload_dir = tmp_path / "uploads"
+    app = create_app(str(tmp_path / "workshop.db"), str(upload_dir))
+    content = b"x" * (EXPECTED_MAX_REQUIREMENT_UPLOAD_BYTES + 1)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/requirements",
+            headers=headers(),
+            files={"file": ("requirements.txt", content, "text/plain")},
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "File exceeds maximum size"}
+    assert not (upload_dir / "requirements.txt").exists()
 
 
 def test_upload_requires_file(tmp_path: Path) -> None:

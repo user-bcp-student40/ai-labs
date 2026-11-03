@@ -217,6 +217,27 @@
               }
             }
           },
+          "400": {
+            "description": "File exceeds maximum size",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                },
+                "example": {
+                  "detail": "File exceeds maximum size"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {

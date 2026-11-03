@@ -24,6 +24,8 @@ from app.models import (
 )
 
 LEGACY_SECRET = "WORKSHOP_SECRET_2026"
+MAX_REQUIREMENT_UPLOAD_BYTES = 10_000_000
+UPLOAD_TOO_LARGE_DETAIL = "File exceeds maximum size"
 TASK_COLUMNS = "id,title,description,status,owner,priority,created_at"
 INSERT_TASK_SQL = (
     "INSERT INTO tasks(title,description,status,owner,priority,created_at) "
@@ -185,10 +187,27 @@ def create_app(db_path: str | None = None, upload_dir: str | None = None) -> Fas
         "/api/requirements",
         status_code=201,
         response_model=RequirementUploadResponse,
+        responses={
+            400: {
+                "description": UPLOAD_TOO_LARGE_DETAIL,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"detail": {"type": "string"}},
+                            "required": ["detail"],
+                        },
+                        "example": {"detail": UPLOAD_TOO_LARGE_DETAIL},
+                    }
+                },
+            }
+        },
     )
     async def upload_requirement(file: UploadFile = File(...), identity: Identity = Depends(legacy_identity)) -> RequirementUploadResponse:
         target = Path(selected_uploads) / str(file.filename)
-        content = await file.read()
+        content = await file.read(MAX_REQUIREMENT_UPLOAD_BYTES + 1)
+        if len(content) > MAX_REQUIREMENT_UPLOAD_BYTES:
+            raise HTTPException(status_code=400, detail=UPLOAD_TOO_LARGE_DETAIL)
         target.write_bytes(content)
         return RequirementUploadResponse(
             owner=identity["username"],
