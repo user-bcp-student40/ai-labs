@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import axios from 'axios';
 import merge from 'lodash/merge';
+import { SessionService } from '../session/session.service';
 
 @Component({
   selector: 'app-login',
@@ -19,7 +20,7 @@ export class LoginComponent {
   message: any = '';
   preferences: any = { theme: 'light', showTips: true, compact: false };
 
-  constructor(private router: Router) {
+  constructor(private router: Router, private session: SessionService) {
     try {
       const saved = JSON.parse(localStorage.getItem('workshop_preferences') || '{}');
       this.preferences = merge(this.preferences, saved);
@@ -44,8 +45,7 @@ export class LoginComponent {
             { timeout: 5000 }
           );
           if (response && response.data && response.data.token) {
-            localStorage.setItem('workshop_token', response.data.token);
-            localStorage.setItem('workshop_user', JSON.stringify(response.data.user));
+            this.session.save(response.data.token, response.data.user);
             localStorage.setItem('workshop_preferences', JSON.stringify(this.preferences));
             await this.router.navigate(['/dashboard']);
           } else {
