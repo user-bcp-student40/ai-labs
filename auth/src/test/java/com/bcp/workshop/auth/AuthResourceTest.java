@@ -19,6 +19,7 @@ class AuthResourceTest {
     private static final String CLIENT = "angular-workshop";
     private static final String STUDENT_USERNAME = "student";
     private static final String STUDENT_PASSWORD = "Workshop123!";
+    private static final String SQL_INJECTION_PAYLOAD = "' OR '1'='1";
     private static final int HTTP_OK = 200;
     private static final int HTTP_BAD_REQUEST = 400;
     private static final int HTTP_UNAUTHORIZED = 401;
@@ -95,6 +96,18 @@ class AuthResourceTest {
     @DisplayName("Rechazo de credenciales inválidas: usuario inexistente con comilla simple")
     void rejectsUnknownUsernameContainingSingleQuote() {
         assertRejectedWithoutToken(postLogin(credentials("o'brien", STUDENT_PASSWORD)), HTTP_UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("Intento de inyección SQL en el usuario: 401 sin token")
+    void rejectsSqlInjectionInUsername() {
+        assertRejectedWithoutToken(postLogin(credentials(SQL_INJECTION_PAYLOAD, STUDENT_PASSWORD)), HTTP_UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("Intento de inyección SQL en la contraseña: 401 sin token")
+    void rejectsSqlInjectionInPassword() {
+        assertRejectedWithoutToken(postLogin(credentials(STUDENT_USERNAME, SQL_INJECTION_PAYLOAD)), HTTP_UNAUTHORIZED);
     }
 
     private static Map<String, String> credentials(String username, String password) {
